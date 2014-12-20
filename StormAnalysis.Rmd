@@ -1,9 +1,11 @@
 # Impacts of storm events on human health and economy in the United States
 
 ## Summary
-[TODO]
-[at most 10 complete sentences]
-Consider writing your report as if it were to be read by a government or municipal manager who might be responsible for preparing for severe weather events and will need to prioritize resources for different types of events. However, there is no need to make any specific recommendations in your report
+This report summarizes the top-10 most impactful types of storm events to diverse factors in the United States. These factors include impact on human health, both fatalities and injuries, along with economical ones, property and crop damage costs.
+
+This report found that tornadoes have the highest impact on human health. It was also found that floods, hurricanes, and tornadoes have the greatest economical consequences. Refer to the Results section for more in-depth details.
+
+The results were derived from data by the U.S. National Oceanic and Atmospheric Administration (NOAA). The full data processing is provided for anyone wishing to reproduce these results.
 
 
 ## Data Processing
@@ -15,7 +17,6 @@ The analysis starts from the raw data which is downloaded from the course web si
 
 ```{r}
 library(R.utils)
-
 infile <- "repdata-data-StormData.csv"
 if (!file.exists(infile)) {
     infilename <- "repdata-data-StormData.csv.bz2"
@@ -26,11 +27,11 @@ if (!file.exists(infile)) {
 ```
 
 #### Processing/transforming the data
-We load the uncompressed data using the `data.table` package. We also rework `EVTYPE` to make it display as capitalized words for prettier results when plotting.
+We load the uncompressed data using the `data.table` package throught `fread`. We only select certain columns which will be drescribed in the following sections. We also rework `EVTYPE` to make it display as capitalized words for prettier results when plotting.
 
 ```{r, results='hide', warning=FALSE}
 library(data.table)
-data <- fread(infile)
+data <- fread(infile, select = c('EVTYPE','FATALITIES','INJURIES', 'PROPDMG', 'PROPDMGEXP', 'CROPDMG', 'CROPDMGEXP'))
 data$EVTYPE <- as.factor(capitalize(tolower(data$EVTYPE)))
 ```
 
@@ -38,20 +39,22 @@ data$EVTYPE <- as.factor(capitalize(tolower(data$EVTYPE)))
 We choose to use the `FATALITIES` and `INJURIES` columns of the data set as indicators of the types of storm events linked to population health. Moreover, we selected the top-10 contributors which have the highest negative impact on population health in order to prevent cluttering the report.
 
 ```{r}
-health <- data[, list(fatalities=sum(FATALITIES), injuries=sum(INJURIES)), keyby=EVTYPE]
+# Compute health where a fatality or injury is observed
+health <- data[FATALITIES>0|INJURIES>0]
+health <- health[, list(fatalities=sum(FATALITIES), injuries=sum(INJURIES)), keyby=EVTYPE]
 
-# Compute top-10 highest contributor to fatalities
+# Compute top-10 greatest contributors to fatalities
 fatalities <- health[order(-fatalities)][1:10,]
 fatalities$EVTYPE <- reorder(fatalities$EVTYPE, fatalities$fatalities)
 
-# Compute top-10 highest contributor to injuries
+# Compute top-10 greatest contributors to injuries
 injuries <- health[order(-injuries)][1:10,]
 injuries$EVTYPE <- reorder(injuries$EVTYPE, injuries$injuries)
 ```
 
 
 ### Types of storm events which are linked to economic consequences
-We choose to use the property damage, `PROPDMG` and `PROPDMGEXP` columns, and the crop damage, `CROPDMG` and `CROPDMGEXP` columns, as the combined factors representing economic consequences. We also combined both into a single damage value in dollars.
+We choose to use the property damage, `PROPDMG` and `PROPDMGEXP` columns, and the crop damage, `CROPDMG` and `CROPDMGEXP` columns, as the combined factors representing economic consequences. We also combined both into a single damage value in billions of dollars.
 
 > We interpreted the damage magnitude, `PROPDMGEXP` and `CROPDMGEXP`, as a multiplier to the respective damage value, `PROPDMG` and `CROPDMG`. The mapping is described in the following table (ignoring casing).
 
@@ -62,24 +65,33 @@ M|1e6
 B|1e9
 Other|1
 
-Therefore, we multiply the damage value by the corresponding multiplier in the previous table. This was implemented using the `tomultiplier` function. We also grouped `damage` values by `EVTYPE`.
+Therefore, we multiply the damage value by the corresponding multiplier in the previous table. This was implemented using the `tomultiplier` function. We also grouped `damage` values by `EVTYPE` and preserved damage which had a cost greater than zero.
 
 ```{r}
-multiplier_map <- list(k=1e3, m=1e6, b=1e9)
+# Create a function which maps a string to a multiplication factor
+damage_multiplier <- list(k=1e3, K=1e3, m=1e6, M=1e6, b=1e9, B=1e9)
 tomultiplier <- function(x) {
-    x <- tolower(x)
-    x[x == ''] <- '+'
-    return(ifelse(x %in% names(multiplier_map), unlist(multiplier_map[x]), 1))
+    # If in the map, use the map's factor, otherwise default to 1
+    return(ifelse(x %in% names(damage_multiplier), unlist(damage_multiplier[x]), 1))
 }
 
-damage <- data[,list(damage=CROPDMG * tomultiplier(CROPDMGEXP) + PROPDMG * tomultiplier(PROPDMGEXP)), keyby=EVTYPE][damage>0,]
+# Compute damage cost where a crop or property damage is observed
+damage <- data[CROPDMG>0 | PROPDMG>0,]
+
+# Compute the total damage cost in billions of dollars
+# by summing the crop and property damage costs
+damage <- damage[,list(cost=sum(CROPDMG * tomultiplier(CROPDMGEXP) + PROPDMG * tomultiplier(PROPDMGEXP))/1e9), keyby=EVTYPE]
+
+# Compute top-10 highest contributors to damage cost
+damage.cost <- damage[order(-cost)][1:10,]
+damage.cost$EVTYPE <- reorder(damage.cost$EVTYPE, damage.cost$cost)
 ```
 
 
 ## Results
 
 ### Types of storm events which are the most harmful to population health
-Population health impacts have been derived from the number of `FATALITIES` and the number of `INJURIES` in the data set. We have opted to display the top-10 most event type contributors in this report.
+Population health impacts have been derived from the number of `FATALITIES` and the number of `INJURIES` in the data set. We have opted to display the top-10 most event type contributors in this report in order to keep it succint.
 
 The following figure shows the top-10 most fatal storm event types.
 
@@ -88,8 +100,8 @@ library(ggplot2)
 qplot(x=EVTYPE, y=fatalities, data=fatalities, geom="bar", stat="identity") +
     coord_flip() +
     ggtitle("Top-10 storm event type contributors to fatalities") +
-    xlab("Number of fatalities") +
-    ylab("Storm event type")
+    ylab("Number of fatalities") +
+    xlab("Storm event type")
 ```
 
 The following figure shows the top-10 most dangerous storm event types causing human injuries.
@@ -98,10 +110,20 @@ The following figure shows the top-10 most dangerous storm event types causing h
 qplot(x=EVTYPE, y=injuries, data=injuries, geom="bar", stat="identity") +
     coord_flip() +
     ggtitle("Top-10 storm event type contributors to injuries") +
-    xlab("Number of injuries") +
-    ylab("Storm event type")
+    ylab("Number of injuries") +
+    xlab("Storm event type")
 ```
 
 
 ### Types of storm events which have the greatest economic consequences
-Across the United States, which types of events have the greatest economic consequences?
+Economic impacts have been derived from the estimated costs associated to property and crop damage in the data set. We have opted to display the top-10 most event type contributors in this report in order to keep it succint.
+
+The following figure shows the top-10 storm event types that have the greatest damage cost, i.e. economic consequences.
+
+```{r}
+qplot(x=EVTYPE, y=cost, data=damage.cost, geom="bar", stat="identity") +
+    coord_flip() +
+    ggtitle("Top-10 storm event type contributors to damage cost") +
+    ylab("Damage cost ($ billions)") +
+    xlab("Storm event type")
+```
