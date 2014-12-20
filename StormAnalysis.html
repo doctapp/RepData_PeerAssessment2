@@ -67,8 +67,34 @@ if (window.hljs && document.readyState && document.readyState === "complete") {
 <div id="downloading-and-reading-the-compressed-storm-data" class="section level4">
 <h4>Downloading and reading the compressed storm data</h4>
 <p>The analysis starts from the raw data which is downloaded from the course web site. Because the data set is quite large, we first uncompress this data using the <code>R.utils</code> package.</p>
-<pre class="r"><code>library(R.utils)
-infile &lt;- &quot;repdata-data-StormData.csv&quot;
+<pre class="r"><code>library(R.utils)</code></pre>
+<pre><code>## Loading required package: R.oo
+## Loading required package: R.methodsS3
+## R.methodsS3 v1.6.1 (2014-01-04) successfully loaded. See ?R.methodsS3 for help.
+## R.oo v1.18.0 (2014-02-22) successfully loaded. See ?R.oo for help.
+## 
+## Attaching package: 'R.oo'
+## 
+## The following objects are masked from 'package:methods':
+## 
+##     getClasses, getMethods
+## 
+## The following objects are masked from 'package:base':
+## 
+##     attach, detach, gc, load, save
+## 
+## R.utils v1.34.0 (2014-10-07) successfully loaded. See ?R.utils for help.
+## 
+## Attaching package: 'R.utils'
+## 
+## The following object is masked from 'package:utils':
+## 
+##     timestamp
+## 
+## The following objects are masked from 'package:base':
+## 
+##     cat, commandArgs, getOption, inherits, isOpen, parse, warnings</code></pre>
+<pre class="r"><code>infile &lt;- &quot;repdata-data-StormData.csv&quot;
 if (!file.exists(infile)) {
     infilename &lt;- &quot;repdata-data-StormData.csv.bz2&quot;
     url &lt;- &quot;https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2&quot;
